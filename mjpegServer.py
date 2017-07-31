@@ -7,6 +7,7 @@ import threadly
 import litesockets
 from io import BytesIO
 import logging
+
 if sys.version_info < (3,):
   def b(x):
     return x
@@ -30,8 +31,11 @@ HTML="""<html>
 
 class MjpegServer():
 
-  def __init__(self, ip, port, hflip=False, vflip=False, delayMS=100):
+  def __init__(self, ip, port, hflip=False, vflip=False, delayMS=50):
     self.__camera = PiCamera(framerate=30)
+#    self.__camera.resolution= (1920,1080)
+#    self.__camera.resolution= (1280,720)
+    self.__camera.resolution= (853,480)
     self.__camera.vflip = vflip
     self.__camera.hflip = hflip
     self.__camera.exposure_mode = 'auto'
@@ -51,14 +55,17 @@ class MjpegServer():
       return
     global GLOBALHEADER
     bio=BytesIO()
-    self.__camera.capture(bio, 'jpeg', use_video_port=True)
+    self.__camera.capture(bio, 'jpeg', use_video_port=True, quality=35)
     h = b(GLOBALHEADER.format(len(bio.getvalue()))) + bio.getvalue()
+    print len(h)
     for c in self.__good:
       if not c.isClosed() and c.getWriteBufferSize() == 0:
         try:
           c.write(h)
         except:
           pass
+      else:
+        print "skip"
   
   def __acceptor(self, client):
     client.setReader(self.__reader)
@@ -77,6 +84,15 @@ class MjpegServer():
           self.__log.info("Client sent http headers, starting stream:{}".format(client))
           client.write("HTTP/1.1 200 OK\r\nContent-Type: multipart/x-mixed-replace;boundary=--IPCAMDATA\r\nConnection: close\r\n\r\n")
           self.__good.append(client)
+        elif r[1].strip()[:7]==b"/right":
+          rightIO()
+          client.write("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}".format(0, ""))
+        elif r[1].strip()[:7]==b"/left":
+          leftIO()
+          client.write("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}".format(0, ""))
+        elif r[1].strip()[:7]==b"/center":
+          centerIO()
+          client.write("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}".format(0, ""))
         elif r[1].strip() == b"/":
           self.__log.info("Client sent http headers, starting stream:{}".format(client))
           client.write("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}".format(len(HTML), HTML))

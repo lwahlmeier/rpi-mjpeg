@@ -1,0 +1,11 @@
+[Unit]
+Description=Mjpeg Server
+After=syslog.target network.target
+
+[Service]
+Type=simple
+PIDFile=/var/run/mjpegServer.pid
+ExecStart=/usr/local/bin/mjpegServer.py --port 8080
+
+[Install]
+WantedBy=multi-user.target

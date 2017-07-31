@@ -15,7 +15,7 @@ setup (# Distribution meta-data
        license = "unlicense",
        description = "A mjpeg server for rasberrypi",
        install_requires = ['threadly>=0.7.2', 'litesockets>=0.7.1', 'picamera>=1.13'],
-       scripts =  ['mjpegServer'],
+       scripts =  ['mjpegServer.py'],
        keywords = ["networking"],
        classifiers=[
         'Development Status :: 4 - Beta',
