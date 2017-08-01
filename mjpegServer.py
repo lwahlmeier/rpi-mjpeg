@@ -33,6 +33,7 @@ class MjpegServer():
 
   def __init__(self, ip, port, hflip=False, vflip=False, delayMS=50):
     self.__camera = PiCamera(framerate=30)
+    self.__delay = delayMS
 #    self.__camera.resolution= (1920,1080)
 #    self.__camera.resolution= (1280,720)
     self.__camera.resolution= (853,480)
@@ -45,10 +46,9 @@ class MjpegServer():
     self.__clients = {}
     self.__good = []
     self.__log = logging.getLogger("MjpegServer:{}:{}".format(ip, port))
-    self.__pool.schedule(self.__runit, delay=delayMS, recurring=True, key="CAMERA")
     self.__server.setOnClient(self.__acceptor)
     self.__server.start()
-    self.__log.info("New MjpegServer started!")
+    self.__log.info("New MjpegServer started! "+str(self.__delay))
 
   def __runit(self):
     if len(self.__good) == 0:
@@ -57,7 +57,6 @@ class MjpegServer():
     bio=BytesIO()
     self.__camera.capture(bio, 'jpeg', use_video_port=True, quality=35)
     h = b(GLOBALHEADER.format(len(bio.getvalue()))) + bio.getvalue()
-    print len(h)
     for c in self.__good:
       if not c.isClosed() and c.getWriteBufferSize() == 0:
         try:
@@ -65,7 +64,10 @@ class MjpegServer():
         except:
           pass
       else:
-        print "skip"
+        pass
+        #print "skip"
+    if len(self.__good) != 0:
+      self.__pool.schedule(self.__runit, delay=self.__delay, key="CAMERA")
   
   def __acceptor(self, client):
     client.setReader(self.__reader)
@@ -83,7 +85,10 @@ class MjpegServer():
         if r[1].strip()[:7]==b"/stream":
           self.__log.info("Client sent http headers, starting stream:{}".format(client))
           client.write("HTTP/1.1 200 OK\r\nContent-Type: multipart/x-mixed-replace;boundary=--IPCAMDATA\r\nConnection: close\r\n\r\n")
+          tmp = len(self.__good)
           self.__good.append(client)
+          if tmp == 0:
+            self.__pool.schedule(self.__runit, key="CAMERA")
         elif r[1].strip()[:7]==b"/right":
           rightIO()
           client.write("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}".format(0, ""))
@@ -119,7 +124,7 @@ logging.basicConfig(level=logging.DEBUG)
 parser = argparse.ArgumentParser()
 parser.add_argument("--port", help="port to use", type=int)
 parser.add_argument("--ip", help="ip address to listen on", type=str, default="0.0.0.0")
-parser.add_argument("--delay", help="delay in ms between frames", type=int, default=100)
+parser.add_argument("--delay", help="delay in ms between frames", type=int, default=50)
 parser.add_argument("--vflip", help="flip image vertically", action="store_true")
 parser.add_argument("--hflip", help="flip image horizontally", action="store_true")
 
